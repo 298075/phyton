@@ -3,13 +3,14 @@ import os
 
 def verify_user(ic_number, password):
     """
-    验证IC号码是否为12位，且密码是否为IC号的最后4位
+    Verify the user's credentials by checking if the IC number is 12 digits long
+    and if the password matches the last 4 digits of the IC number.
     """
     return len(ic_number) == 12 and ic_number[-4:] == password
 
 def calculate_tax(income, tax_relief):
     """
-    根据收入与减免额，计算马来西亚简化税额
+    Calculate the tax payable based on Malaysian tax rates.
     """
     net_income = income - tax_relief
     if net_income <= 0:
@@ -21,38 +22,83 @@ def calculate_tax(income, tax_relief):
     else:
         return 15000 + (net_income - 100000) * 0.3
 
-def save_to_csv(user_id, ic_number, income, tax_relief, tax_payable, filename="user_data.csv"):
+def calculate_total_relief(individual=True, spouse_income=0, num_children=0,
+                           medical_expenses=0, lifestyle_expenses=0,
+                           education_fees=0, parental_support=0):
     """
-    将用户数据写入CSV文件（若文件不存在则创建）
+    Calculate the total relief based on the conditions specified.
     """
-    file_exists = os.path.exists(filename)
-    with open(filename, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        if not file_exists:
-            writer.writerow(['ID', 'IC Number', 'Income', 'Tax Relief', 'Tax Payable'])
-        writer.writerow([user_id, ic_number, income, tax_relief, tax_payable])
+    total = 0
+    if individual:
+        total += 9000  # Individual relief
+    if spouse_income <= 4000:
+        total += 4000  # Spouse relief (if spouse income is <= RM4,000)
+    total += min(num_children, 12) * 8000  # Child relief, max 12 children
+    total += min(medical_expenses, 8000)  # Medical expenses relief
+    total += min(lifestyle_expenses, 2500)  # Lifestyle expenses relief
+    total += min(education_fees, 7000)  # Education fees relief
+    total += min(parental_support, 5000)  # Parental support relief
+    return total
 
-def read_from_csv(filename="user_data.csv"):
+def generate_new_user_id(filename="user_data.csv"):
     """
-    从CSV文件中读取并显示数据
+    Generate a new user ID, e.g., user001, user002, etc.
     """
     if not os.path.exists(filename):
-        print("尚未有记录。")
-        return
+        return "user001"
+    max_id = 0
     with open(filename, mode='r') as file:
         reader = csv.reader(file)
+        next(reader, None)  # Skip the header
         for row in reader:
-            print(', '.join(row))
+            if row and row[0].startswith("user"):
+                try:
+                    num = int(row[0][4:])
+                    if num > max_id:
+                        max_id = num
+                except ValueError:
+                    continue
+    return f"user{max_id + 1:03d}"
 
 def is_registered(user_id, filename="user_data.csv"):
     """
-    检查用户ID是否已存在于CSV中
+    Check if the user is already registered.
     """
     if not os.path.exists(filename):
         return False
-    with open(filename, mode='r') as file:
+    with open(filename, 'r') as file:
         reader = csv.reader(file)
         for row in reader:
             if row and row[0] == user_id:
                 return True
     return False
+
+def save_to_csv(data, filename="user_data.csv"):
+    """
+    Save the user data to a CSV file.
+    """
+    try:
+        file_exists = os.path.exists(filename)
+        with open(filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            if not file_exists:
+                writer.writerow(['ID', 'IC Number', 'Income', 'Tax Relief', 'Tax Payable'])
+            writer.writerow(data)
+        print("✅ Data saved to CSV.")
+    except Exception as e:
+        print(f"❌ Error saving data to CSV: {e}")
+
+def read_from_csv(filename="user_data.csv"):
+    """
+    Read and display all records from the CSV file.
+    """
+    if not os.path.exists(filename):
+        print("No records found.")
+        return
+    try:
+        with open(filename, mode='r') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                print(', '.join(row))
+    except Exception as e:
+        print(f"❌ Error reading from CSV: {e}")
